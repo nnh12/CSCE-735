@@ -1,7 +1,7 @@
 #!/bin/bash
 ##ENVIRONMENT SETTINGS; CHANGE WITH CAUTION
 #SBATCH --export=NONE            #Do not propagate environment
-#SBATCH --get-user-env=L         #Replicate login environment
+#SBATCH --get-user-env           #Replicate login environment
 #
 ##NECESSARY JOB SPECIFICATIONS
 #SBATCH --job-name=JobName       #Set the job name to "JobName"
