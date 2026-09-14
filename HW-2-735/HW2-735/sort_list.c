@@ -14,11 +14,19 @@
 
 #define DEBUG 0
 
+// Barrier used to synchronize threads
+typedef struct {
+    pthread_mutex_t lock;
+    pthread_cond_t cond;
+    int count;
+    int generation;
+    int num_threads;
+} barrier_t;
+
 // Thread variables
-//
-// VS: ... declare thread variables, mutexes, condition varables, etc.,
-// VS: ... as needed for this assignment 
-//
+pthread_t p_threads[MAX_THREADS];
+pthread_attr_t attr;
+barrier_t barrier;
 
 // Global variables
 int num_threads;		// Number of threads to create - user input 
@@ -26,6 +34,8 @@ int list_size;			// List size
 int *list;			// List of values
 int *work;			// Work array
 int *list_orig;			// Original list of values, used for error checking
+int ptr[MAX_THREADS+1];		// Starting position of each sublist
+int q_levels;			// Number of merge levels
 
 // Print list - for debugging
 void print_list(int *list, int list_size) {
@@ -105,92 +115,133 @@ int binary_search_le(int v, int *list, int first, int last) {
     return right;
 }
 
+// Initialize barrier
+void barrier_init(barrier_t *b, int n) {
+    b->count = 0;
+    b->generation = 0;
+    b->num_threads = n;
+    pthread_mutex_init(&b->lock, NULL);
+    pthread_cond_init(&b->cond, NULL);
+}
+
+// Wait for all threads to arrive at barrier
+void barrier_wait(barrier_t *b) {
+    int my_gen;
+    pthread_mutex_lock(&b->lock);
+    my_gen = b->generation;
+    b->count++;
+    if (b->count == b->num_threads) {
+        b->count = 0;
+        b->generation++;
+        pthread_cond_broadcast(&b->cond);
+    } else {
+        while (my_gen == b->generation) {
+            pthread_cond_wait(&b->cond, &b->lock);
+        }
+    }
+    pthread_mutex_unlock(&b->lock);
+}
+
+// Thread routine: sorts its own sublist, then merges it into larger
+// sublists for each merge level
+void *merge_sort_thread(void *arg) {
+    int my_id = (int)(long)arg;
+    int i, level;
+    int my_list_size;
+    int my_blk_size, my_own_blk, my_own_idx;
+    int my_search_blk, my_search_idx, my_search_idx_max;
+    int my_write_blk, my_write_idx;
+    int my_search_count;
+    int idx, i_write;
+    int np = list_size/num_threads; 	// Sub list size 
+
+    // Sort local list
+    my_list_size = ptr[my_id+1]-ptr[my_id];
+    qsort(&list[ptr[my_id]], my_list_size, sizeof(int), compare_int);
+
+    // Wait until every thread has sorted its sublist
+    barrier_wait(&barrier);
+
+    // Sort list
+    for (level = 0; level < q_levels; level++) {
+
+        // Each thread scatters its sub_list into work array
+        my_blk_size = np * (1 << level); 
+
+        my_own_blk = ((my_id >> level) << level);
+        my_own_idx = ptr[my_own_blk];
+
+        my_search_blk = ((my_id >> level) << level) ^ (1 << level);
+        my_search_idx = ptr[my_search_blk];
+        my_search_idx_max = my_search_idx+my_blk_size;
+
+        my_write_blk = ((my_id >> (level+1)) << (level+1));
+        my_write_idx = ptr[my_write_blk];
+
+        idx = my_search_idx;
+        my_search_count = 0;
+
+        // Binary search for 1st element
+        if (my_search_blk > my_own_blk) {
+            idx = binary_search_lt(list[ptr[my_id]], list, my_search_idx, my_search_idx_max); 
+        } else {
+            idx = binary_search_le(list[ptr[my_id]], list, my_search_idx, my_search_idx_max); 
+        }
+        my_search_count = idx - my_search_idx;
+        i_write = my_write_idx + my_search_count + (ptr[my_id]-my_own_idx); 
+        work[i_write] = list[ptr[my_id]];
+
+        // Linear search for 2nd element onwards
+        for (i = ptr[my_id]+1; i < ptr[my_id+1]; i++) {
+            if (my_search_blk > my_own_blk) {
+                while ((list[i] > list[idx]) && (idx < my_search_idx_max)) {
+                    idx++; my_search_count++;
+                }
+            } else {
+                while ((list[i] >= list[idx]) && (idx < my_search_idx_max)) {
+                    idx++; my_search_count++;
+                }
+            }
+            i_write = my_write_idx + my_search_count + (i-my_own_idx); 
+            work[i_write] = list[i];
+        }
+
+        // Wait until every thread has written its sublist into work array
+        barrier_wait(&barrier);
+
+        // Copy work into list for next iteration
+        for (i = ptr[my_id]; i < ptr[my_id+1]; i++) {
+            list[i] = work[i];
+        } 
+
+        // Wait until every thread has copied its portion before next level
+        barrier_wait(&barrier);
+    }
+
+    pthread_exit(NULL);
+}
+
 // Sort list via parallel merge sort
-//
-// VS: ... to be parallelized using threads ...
-//
 void sort_list(int q) {
 
-    int i, level, my_id; 
-    int np, my_list_size; 
-    int ptr[num_threads+1];
+    int my_id;
 
-    int my_own_blk, my_own_idx;
-    int my_blk_size, my_search_blk, my_search_idx, my_search_idx_max;
-    int my_write_blk, my_write_idx;
-    int my_search_count; 
-    int idx, i_write; 
-    
-    np = list_size/num_threads; 	// Sub list size 
+    q_levels = q;
 
     // Initialize starting position for each sublist
     for (my_id = 0; my_id < num_threads; my_id++) {
-        ptr[my_id] = my_id * np;
+        ptr[my_id] = my_id * (list_size/num_threads);
     }
     ptr[num_threads] = list_size;
 
-    // Sort local lists
+    // Create threads
     for (my_id = 0; my_id < num_threads; my_id++) {
-        my_list_size = ptr[my_id+1]-ptr[my_id];
-        qsort(&list[ptr[my_id]], my_list_size, sizeof(int), compare_int);
+        pthread_create(&p_threads[my_id], &attr, merge_sort_thread, (void *)(long)my_id);
     }
-if (DEBUG) print_list(list, list_size); 
 
-    // Sort list
-    for (level = 0; level < q; level++) {
-
-        // Each thread scatters its sub_list into work array
-	for (my_id = 0; my_id < num_threads; my_id++) {
-
-	    my_blk_size = np * (1 << level); 
-
-	    my_own_blk = ((my_id >> level) << level);
-	    my_own_idx = ptr[my_own_blk];
-
-	    my_search_blk = ((my_id >> level) << level) ^ (1 << level);
-	    my_search_idx = ptr[my_search_blk];
-	    my_search_idx_max = my_search_idx+my_blk_size;
-
-	    my_write_blk = ((my_id >> (level+1)) << (level+1));
-	    my_write_idx = ptr[my_write_blk];
-
-	    idx = my_search_idx;
-	    
-	    my_search_count = 0;
-
-
-	    // Binary search for 1st element
-	    if (my_search_blk > my_own_blk) {
-               idx = binary_search_lt(list[ptr[my_id]], list, my_search_idx, my_search_idx_max); 
-	    } else {
-               idx = binary_search_le(list[ptr[my_id]], list, my_search_idx, my_search_idx_max); 
-	    }
-	    my_search_count = idx - my_search_idx;
-	    i_write = my_write_idx + my_search_count + (ptr[my_id]-my_own_idx); 
-	    work[i_write] = list[ptr[my_id]];
-
-	    // Linear search for 2nd element onwards
-	    for (i = ptr[my_id]+1; i < ptr[my_id+1]; i++) {
-	        if (my_search_blk > my_own_blk) {
-		    while ((list[i] > list[idx]) && (idx < my_search_idx_max)) {
-		        idx++; my_search_count++;
-		    }
-		} else {
-		    while ((list[i] >= list[idx]) && (idx < my_search_idx_max)) {
-		        idx++; my_search_count++;
-		    }
-		}
-		i_write = my_write_idx + my_search_count + (i-my_own_idx); 
-		work[i_write] = list[i];
-	    }
-	}
-        // Copy work into list for next itertion
-	for (my_id = 0; my_id < num_threads; my_id++) {
-	    for (i = ptr[my_id]; i < ptr[my_id+1]; i++) {
-	        list[i] = work[i];
-	    } 
-	}
-if (DEBUG) print_list(list, list_size); 
+    // Wait for all threads to finish
+    for (my_id = 0; my_id < num_threads; my_id++) {
+        pthread_join(p_threads[my_id], NULL);
     }
 }
 
@@ -234,10 +285,10 @@ int main(int argc, char *argv[]) {
     list_orig = (int *) malloc(list_size * sizeof(int));
     work = (int *) malloc(list_size * sizeof(int));
 
-//
-// VS: ... May need to initialize mutexes, condition variables, 
-// VS: ... and their attributes
-//
+// Initialize barrier and thread attributes
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+    barrier_init(&barrier, num_threads);
 
     // Initialize list of random integers; list will be sorted by 
     // multi-threaded parallel merge sort
@@ -251,17 +302,8 @@ int main(int argc, char *argv[]) {
     // duplicate first value at last location to test for repeated values
     list[list_size-1] = list[0]; list_orig[list_size-1] = list_orig[0];
 
-    // Create threads; each thread executes find_minimum
+    // Create threads; each thread sorts and merges its share of the list
     clock_gettime(CLOCK_REALTIME, &start);
-
-//
-// VS: ... may need to initialize mutexes, condition variables, and their attributes
-//
-
-// Serial merge sort 
-// VS: ... replace this call with multi-threaded parallel routine for merge sort
-// VS: ... need to create threads and execute thread routine that implements 
-// VS: ... parallel merge sort
 
     sort_list(q);
 
@@ -289,7 +331,10 @@ int main(int argc, char *argv[]) {
     printf("List Size = %d, Threads = %d, error = %d, time (sec) = %8.4f, qsort_time = %8.4f\n", 
 	    list_size, num_threads, error, total_time, total_time_qsort);
 
-// VS: ... destroy mutex, condition variables, etc.
+// Destroy barrier and thread attributes
+    pthread_attr_destroy(&attr);
+    pthread_mutex_destroy(&barrier.lock);
+    pthread_cond_destroy(&barrier.cond);
 
     free(list); free(work); free(list_orig); 
 
