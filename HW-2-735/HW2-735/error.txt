@@ -1,0 +1,10 @@
+icx -o sort_list.exe sort_list.c
+
+/sw/eb/sw/binutils/2.44-GCCcore-14.3.0/bin/ld: /tmp/icx-1b4509966d/sort_list-810110.o: in function `sort_list':
+sort_list.c:(.text+0xda1): undefined reference to `pthread_create'
+/sw/eb/sw/binutils/2.44-GCCcore-14.3.0/bin/ld: sort_list.c:(.text+0xdcb): undefined reference to `pthread_join'
+/sw/eb/sw/binutils/2.44-GCCcore-14.3.0/bin/ld: /tmp/icx-1b4509966d/sort_list-810110.o: in function `main':
+sort_list.c:(.text+0x1121): undefined reference to `pthread_create'
+/sw/eb/sw/binutils/2.44-GCCcore-14.3.0/bin/ld: sort_list.c:(.text+0x114b): undefined reference to `pthread_join'
+icx: error: linker command failed with exit code 1 (use -v to see invocation)
+
