@@ -1,0 +1,22 @@
+k,q,threads,list_size,time_sec,qsort_time_sec,error
+12,0,1,4096,0.0044,0.0004,0
+12,1,2,4096,0.0007,0.0004,0
+12,2,4,4096,0.0009,0.0004,0
+12,4,16,4096,0.0011,0.0004,0
+12,6,64,4096,0.0047,0.0004,0
+12,8,256,4096,0.0208,0.0004,0
+12,10,1024,4096,0.0932,0.0004,0
+20,0,1,1048576,0.1504,0.1498,0
+20,1,2,1048576,0.0784,0.1501,0
+20,2,4,1048576,0.0398,0.1504,0
+20,4,16,1048576,0.0134,0.1503,0
+20,6,64,1048576,0.0139,0.1499,0
+20,8,256,1048576,0.0335,0.1505,0
+20,10,1024,1048576,0.0979,0.1505,0
+28,0,FAILED,list_size unsupported or run failed
+28,1,FAILED,list_size unsupported or run failed
+28,2,FAILED,list_size unsupported or run failed
+28,4,FAILED,list_size unsupported or run failed
+28,6,FAILED,list_size unsupported or run failed
+28,8,FAILED,list_size unsupported or run failed
+28,10,FAILED,list_size unsupported or run failed
