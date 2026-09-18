@@ -6,7 +6,7 @@ Usage:
   python3 bench_strassen.py                    # defaults below
   python3 bench_strassen.py --exe ./strassen_omp.exe
   python3 bench_strassen.py --kmin 10 --kmax 14 --q 3 4 5 6 7 8 9 --reps 3
-  python3 bench_strassen.py --plot            # also write an image
+  python3 bench_strassen.py --plot            # also write graphs
 
 For every matrix size 2**k (k in [--kmin, --kmax]) and every leaf size
 2**q, it times the executable with 1 thread (T1) and with all available
@@ -16,7 +16,9 @@ cores (Tp), then computes:
     efficiency(p)= speedup(p) / p    where p = number of threads
 
 All values are written to a CSV (default strassen_speedup.csv) so you can
-plot the results later on any machine.
+plot the results later on any machine. With --plot it also writes
+speedup_vs_leaf.png and efficiency_vs_leaf.png (x = leaf size 2^q, one
+line per matrix size k) showing which leaf sizes give the best speedup.
 
 The executable is invoked as:
     ./strassen_omp.exe <log2(matrix_size)> <log2(leaf_size)>
@@ -168,33 +170,43 @@ def main():
         by_k = {}
         for r in rows:
             by_k.setdefault(int(r["k"]), []).append(r)
-        fig, ax = plt.subplots(figsize=(8, 6))
-        for k in sorted(by_k):
-            pts = sorted(by_k[k], key=lambda r: (int(r["q"]), int(r["k"])))
-            xs = [int(r["leaf_size"]) for r in pts]
-            ys = [float(r["speedup"]) for r in pts]
-            ax.plot(xs, ys, marker="o", label=f"k={k} (n={1<<k})")
-            b = max(pts, key=lambda r: float(r["speedup"]))
-            ax.annotate(f"{float(b['speedup']):.2f}x@q={b['q']}",
-                        xy=(int(b["leaf_size"]), float(b["speedup"])),
-                        textcoords="offset points", xytext=(5, 6), fontsize=8)
-        ax.set_xscale("log", base=2)
-        pn = p_threads
-        ax.plot([max(1, min(r["leaf_size"] for r in rows)),
-                 max(r["leaf_size"] for r in rows)],
-                [pn, pn], "--", color="gray", label=f"ideal (S={pn})")
-        ax.set_xticks(sorted({int(r["leaf_size"]) for r in rows}))
-        ax.set_xticklabels([str(s) for s in sorted({int(r["leaf_size"]) for r in rows})])
-        ax.set_xlabel("Leaf matrix size")
-        ax.set_ylabel("Speedup")
-        ax.set_title(f"OpenMP Strassen speedup vs leaf size "
-                     f"({p_threads} threads)")
-        ax.grid(True, which="both", alpha=0.3)
-        ax.legend()
-        fig.tight_layout()
-        out_png = os.path.splitext(args.out)[0] + ".png"
-        fig.savefig(out_png, dpi=150)
-        print(f"Wrote {out_png}")
+        for ylabel, idx, fname in (
+            ("Speedup", "speedup", "speedup_vs_leaf.png"),
+            ("Efficiency", "efficiency", "efficiency_vs_leaf.png"),
+        ):
+            fig, ax = plt.subplots(figsize=(8, 6))
+            leaf_ticks = sorted({int(r["leaf_size"]) for r in rows})
+            for k in sorted(by_k):
+                pts = by_k[k]
+                xs = [int(r["leaf_size"]) for r in pts]
+                ys = [float(r[idx]) for r in pts]
+                ax.plot(xs, ys, marker="o", label=f"k={k} (n={1<<k})")
+                b = max(pts, key=lambda r: float(r["speedup"]))
+                if idx == "speedup":
+                    ax.annotate(f"{float(b['speedup']):.2f}x@q={b['q']}",
+                                xy=(int(b["leaf_size"]), float(b["speedup"])),
+                                textcoords="offset points", xytext=(5, 6),
+                                fontsize=8)
+            ax.set_xscale("log", base=2)
+            pn = p_threads
+            if idx == "speedup":
+                ax.plot([max(1, min(leaf_ticks)), max(leaf_ticks)],
+                        [pn, pn], "--", color="gray",
+                        label=f"ideal (S={pn})")
+            else:
+                ax.axhline(1.0, linestyle="--", color="gray",
+                           label="ideal (E=1)")
+            ax.set_xticks(leaf_ticks)
+            ax.set_xticklabels([str(s) for s in leaf_ticks])
+            ax.set_xlabel("Leaf matrix size (2^q)")
+            ax.set_ylabel(ylabel)
+            ax.set_title(f"OpenMP Strassen {ylabel} vs leaf size "
+                         f"({p_threads} threads)")
+            ax.grid(True, which="both", alpha=0.3)
+            ax.legend()
+            fig.tight_layout()
+            fig.savefig(fname, dpi=150)
+            print(f"Wrote {fname}")
 
 
 if __name__ == "__main__":

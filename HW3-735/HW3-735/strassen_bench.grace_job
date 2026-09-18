@@ -1,0 +1,37 @@
+#!/bin/bash
+##ENVIRONMENT SETTINGS; CHANGE WITH CAUTION
+#SBATCH --export=NONE                #Do not propagate environment
+#SBATCH --get-user-env               #Replicate login environment
+#
+##NECESSARY JOB SPECIFICATIONS
+#SBATCH --job-name=strassen_bench    #Set the job name
+#SBATCH --time=8:00:00               #Set the wall clock limit to 8 hours
+#SBATCH --nodes=1                    #Request 1 node (single node, as required)
+#SBATCH --ntasks-per-node=48         #Request all 48 cores on a Grace node
+#SBATCH --mem=64G                    #Enough memory for the largest (k=14) runs
+#SBATCH --output=strassen_bench.%j.txt   #Send stdout/err to this file
+#
+##OPTIONAL JOB SPECIFICATIONS
+##SBATCH --mail-type=ALL              #Send email on all job events
+##SBATCH --mail-user=your_email@example.edu
+#
+##First Executable Line
+#
+module load intel                   # load Intel software stack
+
+# Compile the parallel C++ code with OpenMP
+icpx -o strassen_omp.exe -qopenmp strassen_omp_202611.cpp
+
+# Run the benchmark on all 48 cores.
+#   - k = 10..14   -> matrix sizes 2^10 .. 2^14
+#   - q = 3..9     -> leaf sizes 2^3 .. 2^9
+#   - reps = 2     -> best (fastest) of 2 runs kept  (dedicated node, cheap)
+# For each (k,q) it times 1-thread (T1) and 48-thread (Tp) runs and writes
+#   strassen_speedup.csv  +  efficiency in the same file
+# With --plot it also writes speedup_vs_leaf.png and efficiency_vs_leaf.png
+python3 bench_strassen.py --exe ./strassen_omp.exe \
+    --kmin 10 --kmax 14 \
+    --q 3 4 5 6 7 8 9 \
+    --reps 2 \
+    --plot \
+    --out strassen_speedup.csv
