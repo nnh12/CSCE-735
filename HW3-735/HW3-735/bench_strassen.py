@@ -46,7 +46,9 @@ def run_once(exe, k, q, threads, timeout):
     env = dict(os.environ, OMP_NUM_THREADS=str(threads))
     try:
         proc = subprocess.run([exe, str(k), str(q)],
-                              capture_output=True, text=True, env=env,
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE,
+                              universal_newlines=True, env=env,
                               timeout=timeout)
     except subprocess.TimeoutExpired:
         return None
