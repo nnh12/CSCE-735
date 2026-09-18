@@ -1,0 +1,9 @@
+p = 64, ntasks-per-node = 4
+n = 10^2
+n = 100, p = 64, pi = 3.1416009869231249, relative error = 2.65e-06, time (sec) =   0.0024
+n = 10^4
+n = 10000, p = 64, pi = 3.1415926544231265, relative error = 2.65e-10, time (sec) =   0.0007
+n = 10^6
+n = 1000000, p = 64, pi = 3.1415926535898757, relative error = 2.63e-14, time (sec) =   0.0018
+n = 10^8
+n = 100000000, p = 64, pi = 3.1415926535897931, relative error = 0.00e+00, time (sec) =   0.0035

@@ -1,0 +1,46 @@
+Number of nodes = 64
+ntasks-per-node = 1
+Total processes = 64
+[bstrap:0:-1@c036] Error: Unable to run bstrap_proxy (pid 2652550, exit code 49152)
+[bstrap:0:-1@c036] poll_for_event (../../../../../src/pm/i_hydra/libhydra/demux/hydra_demux_poll.c:157): check exit codes error
+[bstrap:0:-1@c036] HYD_dmx_poll_wait_for_proxy_event (../../../../../src/pm/i_hydra/libhydra/demux/hydra_demux_poll.c:206): poll for event error
+[bstrap:0:-1@c036] HYD_bstrap_setup (../../../../../src/pm/i_hydra/libhydra/bstrap/src/intel/i_hydra_bstrap.c:1069): error waiting for event
+[bstrap:0:-1@c036] Error setting up the bootstrap proxies
+[bstrap:0:-1@c036] Possible reasons:
+[bstrap:0:-1@c036] 1. Host is unavailable. Please check that all hosts are available.
+[bstrap:0:-1@c036] 2. Cannot launch hydra_bstrap_proxy or it crashed on one of the hosts.
+[bstrap:0:-1@c036]    Make sure hydra_bstrap_proxy is available on all hosts and it has right permissions.
+[bstrap:0:-1@c036] 3. Firewall refused connection.
+[bstrap:0:-1@c036]    Check that enough ports are allowed in the firewall and specify them with the I_MPI_PORT_RANGE variable.
+[bstrap:0:-1@c036] 4. slurm bootstrap cannot launch processes on remote host.
+[bstrap:0:-1@c036]    You may try using -bootstrap option to select alternative launcher.
+srun: error: CPU binding outside of job step allocation, allocated CPUs are: 0x000000000100.
+srun: error: CPU binding outside of job step allocation, allocated CPUs are: 0x000000000020.
+srun: error: CPU binding outside of job step allocation, allocated CPUs are: 0x010000000000.
+srun: error: Task launch for StepId=19531892.1 failed on node c038: Unable to satisfy cpu bind request
+srun: error: Task launch for StepId=19531892.1 failed on node c064: Unable to satisfy cpu bind request
+srun: error: Task launch for StepId=19531892.1 failed on node c080: Unable to satisfy cpu bind request
+srun: error: Application launch failed: Unable to satisfy cpu bind request
+srun: Job step aborted
+[bstrap:0:-1@c700] Error: Unable to run bstrap_proxy (pid 2018410, exit code 49152)
+[bstrap:0:-1@c700] poll_for_event (../../../../../src/pm/i_hydra/libhydra/demux/hydra_demux_poll.c:157): check exit codes error
+[bstrap:0:-1@c700] HYD_dmx_poll_wait_for_proxy_event (../../../../../src/pm/i_hydra/libhydra/demux/hydra_demux_poll.c:206): poll for event error
+[bstrap:0:-1@c700] HYD_bstrap_setup (../../../../../src/pm/i_hydra/libhydra/bstrap/src/intel/i_hydra_bstrap.c:1069): error waiting for event
+[bstrap:0:-1@c700] Error setting up the bootstrap proxies
+[bstrap:0:-1@c700] Possible reasons:
+[bstrap:0:-1@c700] 1. Host is unavailable. Please check that all hosts are available.
+[bstrap:0:-1@c700] 2. Cannot launch hydra_bstrap_proxy or it crashed on one of the hosts.
+[bstrap:0:-1@c700]    Make sure hydra_bstrap_proxy is available on all hosts and it has right permissions.
+[bstrap:0:-1@c700] 3. Firewall refused connection.
+[bstrap:0:-1@c700]    Check that enough ports are allowed in the firewall and specify them with the I_MPI_PORT_RANGE variable.
+[bstrap:0:-1@c700] 4. slurm bootstrap cannot launch processes on remote host.
+[bstrap:0:-1@c700]    You may try using -bootstrap option to select alternative launcher.
+srun: error: CPU binding outside of job step allocation, allocated CPUs are: 0x000100000000.
+srun: error: Task launch for StepId=19531892.15 failed on node c704: Unable to satisfy cpu bind request
+srun: error: Application launch failed: Unable to satisfy cpu bind request
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+[2026-08-27T15:18:03.424] error: *** STEP 19531892.15 ON c702 CANCELLED AT 2026-08-27T15:18:03 DUE to SIGNAL Killed ***
+srun: error: c702: task 0: Killed
+srun: error: c703: task 1: Killed
+[mpiexec@c030] Error: Downstream from host c036 exited abnormally
+[mpiexec@c030] Trying to close other downstreams

@@ -1,0 +1,20 @@
+Processes = 1
+n = 10000000000, p = 1, pi = 3.1415926535897949, relative error = 5.65e-16, time (sec) =  16.2879
+Processes = 4
+n = 10000000000, p = 4, pi = 3.1415926535898286, relative error = 1.13e-14, time (sec) =   4.3354
+Processes = 8
+n = 10000000000, p = 8, pi = 3.1415926535897762, relative error = 5.37e-15, time (sec) =   2.1819
+Processes = 16
+n = 10000000000, p = 16, pi = 3.1415926535898047, relative error = 3.68e-15, time (sec) =   1.3507
+Processes = 32
+n = 10000000000, p = 32, pi = 3.1415926535897754, relative error = 5.65e-15, time (sec) =   1.0654
+Processes = 64
+n = 10000000000, p = 64, pi = 3.1415926535897944, relative error = 4.24e-16, time (sec) =   0.2853
+Processes = 64
+n = 1000000000, p = 64, pi = 3.1415926535897860, relative error = 2.26e-15, time (sec) =   0.0290
+Processes = 64
+n = 10000000, p = 64, pi = 3.1415926535897971, relative error = 1.27e-15, time (sec) =   0.0018
+Processes = 64
+n = 100000, p = 64, pi = 3.1415926535981265, relative error = 2.65e-12, time (sec) =   0.0024
+Processes = 64
+n = 1000, p = 64, pi = 3.1415927369231267, relative error = 2.65e-08, time (sec) =   0.0006

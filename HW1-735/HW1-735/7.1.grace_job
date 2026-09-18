@@ -1,0 +1,27 @@
+#!/bin/bash
+#SBATCH --export=NONE
+#SBATCH --get-user-env
+
+#SBATCH --job-name=pi_n_test
+#SBATCH --time=0:30:00
+#SBATCH --nodes=16
+#SBATCH --ntasks-per-node=4
+#SBATCH --ntasks=64
+#SBATCH --mem=8G
+#SBATCH --output=7.1.txt
+
+module load intel
+
+echo "p = 64, ntasks-per-node = 4"
+
+echo "n = 10^2"
+mpirun -np 64 ./compute_pi_mpi.exe 100
+
+echo "n = 10^4"
+mpirun -np 64 ./compute_pi_mpi.exe 10000
+
+echo "n = 10^6"
+mpirun -np 64 ./compute_pi_mpi.exe 1000000
+
+echo "n = 10^8"
+mpirun -np 64 ./compute_pi_mpi.exe 100000000
