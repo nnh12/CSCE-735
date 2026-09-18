@@ -1,0 +1,14 @@
+[nnh12@grace5 HW3-735]$ python3 bench_strassen.py --exe ./strassen_omp.exe 
+Traceback (most recent call last):
+  File "bench_strassen.py", line 199, in <module>
+    main()
+  File "bench_strassen.py", line 111, in main
+    t1 = best_time(args.exe, k, q, 1, args.reps, args.timeout)
+  File "bench_strassen.py", line 65, in best_time
+    t = run_once(exe, k, q, threads, timeout)
+  File "bench_strassen.py", line 50, in run_once
+    timeout=timeout)
+  File "/usr/lib64/python3.6/subprocess.py", line 423, in run
+    with Popen(*popenargs, **kwargs) as process:
+TypeError: __init__() got an unexpected keyword argument 'capture_output'
+
