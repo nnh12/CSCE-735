@@ -18,7 +18,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-CSV_FILE = "results.csv"
+CSV_FILE = "results_1.csv"
 TPL = [("0", "o"), ("1", "s"), ("2", "^")]
 
 

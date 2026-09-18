@@ -1,0 +1,6 @@
+file,omp_directives,omp_runtime,pthread_calls,mpi_calls
+HW-2-735/HW2-735/sort_list.c,0,0,14,0
+HW-2-735/sort_list.c,0,0,14,0
+HW1-735/HW1-735/compute_pi.c,0,0,6,0
+HW1-735/HW1-735/compute_pi_mpi.c,0,0,0,8
+HW3-735/HW3-735/strassen_omp_202611.cpp,0,4,0,0
