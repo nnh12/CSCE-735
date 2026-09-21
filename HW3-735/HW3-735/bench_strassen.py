@@ -72,6 +72,14 @@ def best_time(exe, k, q, threads, reps, timeout):
     return best
 
 
+def _write_row(writer, header, f, k, size, q, leaf, threads,
+               t1s, tps, speedups, effs):
+    """Write one row to the CSV and flush so results survive interruptions."""
+    writer.writerow(dict(zip(header, (
+        k, size, q, leaf, threads, t1s, tps, speedups, effs))))
+    f.flush()
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -105,43 +113,54 @@ def main():
     ks = list(range(args.kmin, args.kmax + 1))
 
     rows = []
-    for k in ks:
-        size = 1 << k
-        for q in qs:
-            leaf = 1 << q
-            if leaf > size:
-                continue  # program would clamp leaf to matrix size anyway
-            # 1-thread baseline
-            t1 = best_time(args.exe, k, q, 1, args.reps, args.timeout)
-            if t1 is None:
-                print(f"k={k:2d} q={q} leaf={leaf:5d}  FAILED (1 thread)")
-                continue
-            # parallel run on all available cores
-            tp = best_time(args.exe, k, q, p_threads, args.reps, args.timeout)
-            if tp is None:
-                print(f"k={k:2d} q={q} leaf={leaf:5d}  FAILED ({p_threads} threads)")
-                continue
-            speedup = t1 / tp
-            efficiency = speedup / p_threads
-            rows.append({
-                "k": k, "matrix_size": size, "q": q, "leaf_size": leaf,
-                "threads": p_threads, "t1_sec": f"{t1:.6f}",
-                "tp_sec": f"{tp:.6f}", "speedup": f"{speedup:.4f}",
-                "efficiency": f"{efficiency:.4f}",
-            })
-            print(f"k={k:2d} q={q} leaf={leaf:5d} | T1={t1:8.4f}s "
-                  f"Tp={tp:8.4f}s | speedup={speedup:6.2f}x "
-                  f"eff={efficiency:6.2f}")
+    header = ("k", "matrix_size", "q", "leaf_size", "threads",
+              "t1_sec", "tp_sec", "speedup", "efficiency")
+    out = open(args.out, "w", newline="")
+    w = csv.DictWriter(out, fieldnames=header)
+    w.writeheader()
+    out.flush()
+    try:
+        for k in ks:
+            size = 1 << k
+            for q in qs:
+                leaf = 1 << q
+                if leaf > size:
+                    continue  # program would clamp leaf to matrix size anyway
+                # 1-thread baseline
+                t1 = best_time(args.exe, k, q, 1, args.reps, args.timeout)
+                if t1 is None:
+                    print(f"k={k:2d} q={q} leaf={leaf:5d}  FAILED (1 thread)")
+                    _write_row(w, header, out, k, size, q, leaf,
+                               p_threads, "", "", "", "")
+                    continue
+                # parallel run on all available cores
+                tp = best_time(args.exe, k, q, p_threads, args.reps,
+                               args.timeout)
+                if tp is None:
+                    print(f"k={k:2d} q={q} leaf={leaf:5d}  "
+                          f"FAILED ({p_threads} threads)")
+                    _write_row(w, header, out, k, size, q, leaf,
+                               p_threads, f"{t1:.6f}", "", "", "")
+                    continue
+                speedup = t1 / tp
+                efficiency = speedup / p_threads
+                _write_row(w, header, out, k, size, q, leaf, p_threads,
+                           f"{t1:.6f}", f"{tp:.6f}", f"{speedup:.4f}",
+                           f"{efficiency:.4f}")
+                rows.append({
+                    "k": k, "matrix_size": size, "q": q, "leaf_size": leaf,
+                    "threads": p_threads, "t1_sec": f"{t1:.6f}",
+                    "tp_sec": f"{tp:.6f}", "speedup": f"{speedup:.4f}",
+                    "efficiency": f"{efficiency:.4f}",
+                })
+                print(f"k={k:2d} q={q} leaf={leaf:5d} | T1={t1:8.4f}s "
+                      f"Tp={tp:8.4f}s | speedup={speedup:6.2f}x "
+                      f"eff={efficiency:6.2f}")
+    finally:
+        out.close()
 
     if not rows:
-        sys.exit("No successful runs recorded.")
-
-    with open(args.out, "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=[
-            "k", "matrix_size", "q", "leaf_size", "threads",
-            "t1_sec", "tp_sec", "speedup", "efficiency"])
-        w.writeheader()
-        w.writerows(rows)
+        sys.exit("No successful runs recorded (see CSV for failures).")
 
     print(f"\nWrote {len(rows)} rows to {args.out}")
 
