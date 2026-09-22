@@ -85,8 +85,8 @@ def main():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--exe", default=os.environ.get("STRASSEN_EXE", DEFAULT_EXE),
                    help=f"path to executable (default: {DEFAULT_EXE})")
-    p.add_argument("--kmin", type=int, default=10,
-                   help="smallest log2(matrix_size) (default: 10)")
+    p.add_argument("--kmin", type=int, default=14,
+                   help="smallest log2(matrix_size) (default: 14)")
     p.add_argument("--kmax", type=int, default=14,
                    help="largest log2(matrix_size) (default: 14)")
     p.add_argument("--q", type=int, nargs="+", default=[3, 4, 5, 6, 7, 8, 9],
@@ -110,7 +110,7 @@ def main():
     p_threads = args.threads if args.threads > 0 else available_cores()
 
     qs = [q for q in sorted(set(args.q)) if 2 ** q >= 1]
-    ks = list(range(args.kmin, args.kmax + 1))
+    ks = [14]
 
     rows = []
     header = ("k", "matrix_size", "q", "leaf_size", "threads",
