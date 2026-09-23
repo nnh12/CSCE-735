@@ -2,6 +2,15 @@
 // Computes the product of two matrices: C = A * B
 // using Strassen's algorithm
 //
+// Performance notes (vs. the original):
+//  - extract_submatrix() now returns a cheap "view" (row-pointers into the
+//    parent's storage) instead of deep-copying n^2/4 doubles per block, so
+//    recursion no longer multiplies memory traffic by ~8x at every level.
+//  - The C11..C22 result blocks are assembled in a single fused pass written
+//    directly into C's quadrants (no intermediate N/2 x N/2 temporaries).
+//  - standard_product() uses an i-k-j loop order with a vectorizable inner
+//    loop so the base case exploits cache locality and SIMD.
+//
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
@@ -12,7 +21,7 @@
 using namespace std;
 using namespace std::chrono;
 
-#define MAX_MATRIX_SIZE	65536
+#define MAX_MATRIX_SIZE	262144
 #define TOL 1.0e-12
 
 #define DEBUG 1
@@ -53,6 +62,7 @@ class Matrix {
 
     private:
 	double *array;
+	Matrix(int, int, bool, Matrix*, int, int); // view constructor
 	static void strassens_product_task(Matrix&, Matrix&, Matrix&);
 };
 
@@ -104,7 +114,7 @@ void Matrix::strassens_product_task(Matrix& A, Matrix& B, Matrix& C) {
 	return;
     }
 
-    // Extract blocks of A: A11, A12, A21, A22
+    // Extract blocks of A: A11, A12, A21, A22  (cheap views, no copies)
     Matrix A11 = A.extract_submatrix(0, n/2-1, 0, n/2-1);
     Matrix A12 = A.extract_submatrix(0, n/2-1, n/2, n-1);
     Matrix A21 = A.extract_submatrix(n/2, n-1, 0, n/2-1);
@@ -168,54 +178,86 @@ void Matrix::strassens_product_task(Matrix& A, Matrix& B, Matrix& C) {
     // Wait for all products M1..M7 to complete
     #pragma omp taskwait
 
-    // Compute blocks of C: C11, C12, C21, C22 in parallel
-    Matrix C11, C12, C21, C22;
+    // Create the product matrix C. Its four quadrants are views into C so
+    // the combinations below write their result straight into C.
+    C = Matrix(n,n); 
+    Matrix C11 = C.extract_submatrix(0, n/2-1, 0, n/2-1);
+    Matrix C12 = C.extract_submatrix(0, n/2-1, n/2, n-1);
+    Matrix C21 = C.extract_submatrix(n/2, n-1, 0, n/2-1);
+    Matrix C22 = C.extract_submatrix(n/2, n-1, n/2, n-1);
 
+    // Compute blocks of C: C11, C12, C21, C22 in parallel.
+    // Each task writes its quadrant in one fused pass (no temporaries).
     #pragma omp task shared(M1,M4,M7,M5,C11)
     {
-	Matrix C11a = Matrix::addition(M1,M4);
-	Matrix C11b = Matrix::subtraction(M7,M5);
-	C11 = Matrix::addition(C11a, C11b);
+	double **m1 = M1.elements, **m4 = M4.elements;
+	double **m7 = M7.elements, **m5 = M5.elements;
+	double **c11 = C11.elements;
+	for (int i = 0; i < C11.nrows; i++) {
+	    #pragma omp simd
+	    for (int j = 0; j < C11.ncols; j++)
+		c11[i][j] = m1[i][j] + m4[i][j] + m7[i][j] - m5[i][j];
+	}
     }
 
     #pragma omp task shared(M3,M5,C12)
     {
-	C12 = Matrix::addition(M3,M5);
+	double **m3 = M3.elements, **m5 = M5.elements;
+	double **c12 = C12.elements;
+	for (int i = 0; i < C12.nrows; i++) {
+	    #pragma omp simd
+	    for (int j = 0; j < C12.ncols; j++)
+		c12[i][j] = m3[i][j] + m5[i][j];
+	}
     }
 
     #pragma omp task shared(M2,M4,C21)
     {
-	C21 = Matrix::addition(M2,M4);
+	double **m2 = M2.elements, **m4 = M4.elements;
+	double **c21 = C21.elements;
+	for (int i = 0; i < C21.nrows; i++) {
+	    #pragma omp simd
+	    for (int j = 0; j < C21.ncols; j++)
+		c21[i][j] = m2[i][j] + m4[i][j];
+	}
     }
 
     #pragma omp task shared(M1,M2,M3,M6,C22)
     {
-	Matrix C22a = Matrix::subtraction(M1,M2);
-	Matrix C22b = Matrix::addition(M3,M6);
-	C22 = Matrix::addition(C22a, C22b);
+	double **m1 = M1.elements, **m2 = M2.elements;
+	double **m3 = M3.elements, **m6 = M6.elements;
+	double **c22 = C22.elements;
+	for (int i = 0; i < C22.nrows; i++) {
+	    #pragma omp simd
+	    for (int j = 0; j < C22.ncols; j++)
+		c22[i][j] = m1[i][j] - m2[i][j] + m3[i][j] + m6[i][j];
+	}
     }
 
     // Wait for C11..C22 to complete
     #pragma omp taskwait
-
-    // Create the product matrix C
-    C = Matrix(n,n); 
-    C.update_submatrix(C11, 0, n/2-1, 0, n/2-1);
-    C.update_submatrix(C12, 0, n/2-1, n/2, n-1);
-    C.update_submatrix(C21, n/2, n-1, 0, n/2-1);
-    C.update_submatrix(C22, n/2, n-1, n/2, n-1);
 }
  
 // Standard matrix product
 // - return C = A * B
+// - i-k-j loop order with an inner SIMD loop: B rows are reused across i
+//   and the C row stays in cache/registers.
 Matrix Matrix::standard_product(Matrix& A, Matrix& B) {
     if (A.ncols != B.nrows) matrix_error(5); 
     Matrix C(A.nrows,B.ncols); 
     for (int i = 0; i < C.nrows; i++) {
         for (int j = 0; j < C.ncols; j++) {
 	    C.elements[i][j] = 0.0;
-	    for (int k = 0; k < A.ncols; k++) 
-	        C.elements[i][j] += A.elements[i][k]*B.elements[k][j];
+	}
+    }
+    for (int i = 0; i < C.nrows; i++) {
+	double *ci = C.elements[i];
+	for (int k = 0; k < A.ncols; k++) {
+	    double aik = A.elements[i][k];
+	    double *bk = B.elements[k];
+	    #pragma omp simd
+	    for (int j = 0; j < C.ncols; j++) 
+	        ci[j] += aik*bk[j];
 	}
     } 
     return C;
@@ -228,8 +270,12 @@ Matrix Matrix::addition(Matrix& A, Matrix& B) {
     if (A.ncols != B.ncols) A.matrix_error(9); 
     Matrix C(A.nrows,A.ncols);  
     for (int i = 0; i < C.nrows; i++) {
+	double *ci = C.elements[i];
+	double *ai = A.elements[i];
+	double *bi = B.elements[i];
+	#pragma omp simd
         for (int j = 0; j < C.ncols; j++) {
-	    C.elements[i][j] = A.elements[i][j]+B.elements[i][j];
+	    ci[j] = ai[j]+bi[j];
 	}
     } 
     return C;
@@ -242,8 +288,12 @@ Matrix Matrix::subtraction(Matrix& A, Matrix& B) {
     if (A.ncols != B.ncols) A.matrix_error(98); 
     Matrix C(A.nrows,A.ncols);  
     for (int i = 0; i < C.nrows; i++) {
+	double *ci = C.elements[i];
+	double *ai = A.elements[i];
+	double *bi = B.elements[i];
+	#pragma omp simd
         for (int j = 0; j < C.ncols; j++) {
-	    C.elements[i][j] = A.elements[i][j]-B.elements[i][j];
+	    ci[j] = ai[j]-bi[j];
 	}
     } 
     return C;
@@ -265,14 +315,13 @@ int Matrix::compare_matrix(Matrix& A, Matrix& B) {
 
 // Extract submatrix of A
 // - return S = A[row_first:row_last][col_first:col_last]
+// - Returns a VIEW: the submatrix shares storage with A. S.elements points
+//   into A's rows, so no matrix data is copied (cheap). The returned object
+//   owns only its row-pointer array, which is freed by the destructor.
 Matrix Matrix::extract_submatrix(int row_first, int row_last, 
 			  	 int col_first, int col_last) {
-    Matrix S(row_last-row_first+1, col_last-col_first+1); 
-    for (int i = 0; i < S.nrows; i++) {
-        for (int j = 0; j < S.ncols; j++) {
-	    S.elements[i][j] = elements[row_first+i][col_first+j];
-	}
-    } 
+    Matrix S(row_last-row_first+1, col_last-col_first+1, true, this,
+	     row_first, col_first);
     return S;
 }
 
@@ -321,7 +370,22 @@ void Matrix::matrix_error(int error_number) {
 // Default constructor – creates an empty 0x0 matrix
 Matrix::Matrix() : nrows(0), ncols(0), elements(nullptr), array(nullptr) {}
 
+// Private constructor for a submatrix view.
+// The view owns only its row-pointer array; the elements themselves are
+// shared with the parent matrix given by <parent>.
+Matrix::Matrix(int num_rows, int num_cols, bool view, Matrix* parent,
+	       int row_off, int col_off) {
+    nrows = num_rows;
+    ncols = num_cols;
+    elements = new double *[nrows];
+    for (int i = 0; i < nrows; i++) {
+        elements[i] = parent->elements[row_off + i] + col_off;
+    }
+    array = nullptr;
+}
+
 // Copy constructor – deep copy (required for safe use with OpenMP tasks)
+// Works for both owned matrices and views (copies element-wise).
 Matrix::Matrix(const Matrix& src) : nrows(src.nrows), ncols(src.ncols),
                                     elements(nullptr), array(nullptr) {
     if (nrows > 0) {
@@ -329,8 +393,9 @@ Matrix::Matrix(const Matrix& src) : nrows(src.nrows), ncols(src.ncols),
 	array    = new double[nrows * ncols];
 	for (int i = 0; i < nrows; i++)
 	    elements[i] = &(array[i * ncols]);
-	for (int i = 0; i < nrows * ncols; i++)
-	    array[i] = src.array[i];
+	for (int i = 0; i < nrows; i++)
+	    for (int j = 0; j < ncols; j++)
+		array[i * ncols + j] = src.elements[i][j];
     }
 }
 
@@ -346,7 +411,7 @@ Matrix::Matrix(Matrix&& src) noexcept : nrows(src.nrows), ncols(src.ncols),
 // Copy assignment – deep copy
 Matrix& Matrix::operator=(const Matrix& src) {
     if (this != &src) {
-	if (src.nrows > 0 && src.array != nullptr) {
+	if (src.nrows > 0) {
 	    if (nrows != src.nrows || ncols != src.ncols) {
 		delete[] elements;
 		delete[] array;
@@ -357,8 +422,9 @@ Matrix& Matrix::operator=(const Matrix& src) {
 		for (int i = 0; i < nrows; i++)
 		    elements[i] = &(array[i * ncols]);
 	    }
-	    for (int i = 0; i < nrows * ncols; i++)
-		array[i] = src.array[i];
+	    for (int i = 0; i < nrows; i++)
+		for (int j = 0; j < ncols; j++)
+		    array[i * ncols + j] = src.elements[i][j];
 	} else {
 	    delete[] elements;
 	    delete[] array;
@@ -460,6 +526,5 @@ int main(int argc, char *argv[]) {
 	    }
 	} else {
         printf(" Standard = not computed for large matrices \n");
-	}
+    }
 }
-
