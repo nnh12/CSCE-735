@@ -1,0 +1,121 @@
+#!/bin/bash
+##ENVIRONMENT SETTINGS; CHANGE WITH CAUTION
+#SBATCH --export=NONE                #Do not propagate environment
+#SBATCH --get-user-env               #Replicate login environment
+#
+##NECESSARY JOB SPECIFICATIONS
+#SBATCH --job-name=strassen_report   #Set the job name
+#SBATCH --time=8:00:00               #Set the wall clock limit to 8 hours
+#SBATCH --nodes=1                    #Request 1 node (single node, as required)
+#SBATCH --ntasks-per-node=48         #Request all 48 cores on a Grace node
+#SBATCH --mem=64G                    #Peak RSS at k=14 is ~16 GB
+#SBATCH --output=strassen_report.%j.txt   #Send stdout/err to this file
+#
+##OPTIONAL JOB SPECIFICATIONS
+##SBATCH --mail-type=ALL              #Send email on all job events
+##SBATCH --mail-user=your_email@example.edu
+#
+##First Executable Line
+#
+# =============================================================================
+# Graded benchmark for HW3-735 Problem 2.
+#
+# For every matrix size 2^k (k = 10..14) and every leaf size 2^q it measures:
+#     T1  = Strassen with OMP_NUM_THREADS=1
+#     Tp  = Strassen with OMP_NUM_THREADS=48 (all available Grace cores)
+#     speedup    = T1 / Tp
+#     efficiency = speedup / 48
+#
+# Best (fastest) of $REPS runs is kept for each configuration. Results are
+# appended to the CSV and flushed after every row, so a wall-clock kill still
+# leaves a usable partial CSV.
+#
+# Environment overrides:
+#     REPS=2 sbatch strassen_report.grace_job     # more reps (see time budget)
+#     QS="6 7 8"   sbatch strassen_report.grace_job   # fewer leaf sizes
+#
+# TIME BUDGET (8 h limit). The 1-thread k=14 runs dominate everything else:
+# extrapolating from the k=13 1-thread column, q=4..8 at k=14 cost roughly
+# 1700 + 1520 + 1850 + 2210 + 2620 s = 2.75 h. k=10..13 add ~0.4 h and all
+# 48-thread runs add <0.2 h. REPS=1 therefore fits comfortably; REPS=2 does not.
+# The leaf sweep is deliberately restricted to q=4..8 -- q=3 and q=9 were the
+# slowest leaves at k=13 (375 s and 965 s single-threaded) and q=9 would add
+# ~2 h per 1-thread run at k=14 for no gain.
+#
+# Compile and execute on Grace (also answers the PDF's "brief description"
+# requirement):
+#     module load intel
+#     icpx -o strassen_omp.exe -qopenmp strassen_omp_202611.cpp
+#     ./strassen_omp.exe <k> <q>          # k,q are EXPONENTS: 14 8 -> 16384, 256
+#     sbatch strassen_report.grace_job
+# =============================================================================
+
+module load intel                   # load Intel software stack
+
+# Compile the parallel C++ code with OpenMP
+icpx -o strassen_omp.exe -qopenmp strassen_omp_202611.cpp || exit 1
+
+P=48                  # all available cores on a Grace node
+REPS=${REPS:-1}       # runs per configuration; fastest is kept
+KS="10 11 12 13 14"    # matrix sizes 2^k
+QS=${QS:-"4 5 6 7 8 9 10"} # leaf sizes 2^q
+OUT=${OUT:-strassen_speedup_final.csv}   # override with OUT=other.csv sbatch ...
+
+# Run the exe $REPS times at (k,q) with $threads threads; echo the fastest
+# Strassen time in seconds, or nothing if every run failed.
+best_time() {
+    local k=$1 q=$2 threads=$3 r line t best=""
+    for r in $(seq "$REPS"); do
+        line=$(OMP_NUM_THREADS="$threads" ./strassen_omp.exe "$k" "$q" 2>/dev/null || true)
+        t=$(printf '%s\n' "$line" \
+            | sed -nE "s/.*Strassen's \(s\) =[[:space:]]*([0-9.]+).*/\1/p")
+        [ -z "$t" ] && continue
+        if [ -z "$best" ]; then
+            best=$t
+        else
+            best=$(awk -v a="$best" -v b="$t" 'BEGIN{print (b<a)?b:a}')
+        fi
+    done
+    printf '%s' "$best"
+}
+
+echo "k,matrix_size,q,leaf_size,threads,t1_sec,tp_sec,speedup,efficiency" > "$OUT"
+echo "=== k=10..14 leaf sweep | P=$P threads | REPS=$REPS ==="
+echo "host: $(hostname)"
+echo "date: $(date)"
+echo
+
+for k in $KS; do
+    size=$((1 << k))
+    for q in $QS; do
+        leaf=$((1 << q))
+        [ "$leaf" -gt "$size" ] && continue
+
+        t1=$(best_time "$k" "$q" 1)
+        if [ -z "$t1" ]; then
+            echo "k=$k q=$q leaf=$leaf  FAILED (1 thread)"
+            echo "$k,$size,$q,$leaf,$P,,,," >> "$OUT"
+            continue
+        fi
+
+        tp=$(best_time "$k" "$q" "$P")
+        if [ -z "$tp" ]; then
+            echo "k=$k q=$q leaf=$leaf  FAILED ($P threads)"
+            echo "$k,$size,$q,$leaf,$P,$t1,,," >> "$OUT"
+            continue
+        fi
+
+        read speedup efficiency < <(
+            awk -v a="$t1" -v b="$tp" -v p="$P" \
+                'BEGIN{s=a/b; printf "%.4f %.4f\n", s, s/p}')
+        echo "$k,$size,$q,$leaf,$P,$t1,$tp,$speedup,$efficiency" >> "$OUT"
+
+        printf "k=%2d n=%6d q=%d leaf=%5d | T1=%9.4fs Tp=%8.4fs | speedup=%7.2fx eff=%.4f\n" \
+            "$k" "$size" "$q" "$leaf" "$t1" "$tp" "$speedup" "$efficiency"
+    done
+done
+
+echo
+echo "Wrote $(wc -l < "$OUT") lines to $OUT (1 header + data rows)"
+echo "Next: python3 plot_csv.py $OUT    # speedup / efficiency vs leaf size"
+echo "date: $(date)"

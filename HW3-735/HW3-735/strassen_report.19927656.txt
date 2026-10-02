@@ -1,0 +1,11 @@
+=== k=10..14 leaf sweep | P=48 threads | REPS=1 ===
+host: c560
+date: Thu Oct  1 16:19:57 CDT 2026
+
+k=14 n= 16384 q=7 leaf=  128 | T1= 798.1591s Tp= 30.4160s | speedup=  26.24x eff=0.5467
+k=14 n= 16384 q=8 leaf=  256 | T1= 862.4126s Tp= 33.9167s | speedup=  25.43x eff=0.5297
+k=14 n= 16384 q=9 leaf=  512 | T1=1012.2175s Tp= 34.9332s | speedup=  28.98x eff=0.6037
+
+Wrote 4 lines to strassen_speedup_14.csv (1 header + data rows)
+Next: python3 plot_csv.py strassen_speedup_14.csv    # speedup / efficiency vs leaf size
+date: Thu Oct  1 17:06:15 CDT 2026

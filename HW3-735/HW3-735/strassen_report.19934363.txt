@@ -1,0 +1,43 @@
+=== k=10..14 leaf sweep | P=48 threads | REPS=1 ===
+host: c656
+date: Fri Oct  2 10:21:45 CDT 2026
+
+k=10 n=  1024 q=4 leaf=   16 | T1=   3.1021s Tp=  0.6490s | speedup=   4.78x eff=0.0996
+k=10 n=  1024 q=5 leaf=   32 | T1=   0.4681s Tp=  1.0033s | speedup=   0.47x eff=0.0097
+k=10 n=  1024 q=6 leaf=   64 | T1=   0.7970s Tp=  0.3227s | speedup=   2.47x eff=0.0515
+k=10 n=  1024 q=7 leaf=  128 | T1=   1.1214s Tp=  0.6953s | speedup=   1.61x eff=0.0336
+k=10 n=  1024 q=8 leaf=  256 | T1=   0.5439s Tp=  1.0732s | speedup=   0.51x eff=0.0106
+k=10 n=  1024 q=9 leaf=  512 | T1=   0.9705s Tp=  0.8229s | speedup=   1.18x eff=0.0246
+k=10 n=  1024 q=10 leaf= 1024 | T1=   0.7413s Tp=  0.6415s | speedup=   1.16x eff=0.0241
+k=11 n=  2048 q=4 leaf=   16 | T1=   3.4972s Tp=  0.8571s | speedup=   4.08x eff=0.0850
+k=11 n=  2048 q=5 leaf=   32 | T1=   3.1939s Tp=  0.4946s | speedup=   6.46x eff=0.1345
+k=11 n=  2048 q=6 leaf=   64 | T1=   2.7551s Tp=  1.0415s | speedup=   2.65x eff=0.0551
+k=11 n=  2048 q=7 leaf=  128 | T1=   2.3951s Tp=  0.6666s | speedup=   3.59x eff=0.0749
+k=11 n=  2048 q=8 leaf=  256 | T1=   3.1903s Tp=  0.4928s | speedup=   6.47x eff=0.1349
+k=11 n=  2048 q=9 leaf=  512 | T1=   3.4273s Tp=  1.0037s | speedup=   3.41x eff=0.0711
+k=11 n=  2048 q=10 leaf= 1024 | T1=   3.1302s Tp=  3.1737s | speedup=   0.99x eff=0.0205
+k=12 n=  4096 q=4 leaf=   16 | T1=  24.1875s Tp=  1.6157s | speedup=  14.97x eff=0.3119
+k=12 n=  4096 q=5 leaf=   32 | T1=  16.6810s Tp=  1.8067s | speedup=   9.23x eff=0.1924
+k=12 n=  4096 q=6 leaf=   64 | T1=  16.3199s Tp=  1.4178s | speedup=  11.51x eff=0.2398
+k=12 n=  4096 q=7 leaf=  128 | T1=  16.5278s Tp=  1.5615s | speedup=  10.58x eff=0.2205
+k=12 n=  4096 q=8 leaf=  256 | T1=  18.0739s Tp=  1.1068s | speedup=  16.33x eff=0.3402
+k=12 n=  4096 q=9 leaf=  512 | T1=  20.4499s Tp=  1.9205s | speedup=  10.65x eff=0.2218
+k=12 n=  4096 q=10 leaf= 1024 | T1=  22.1296s Tp=  3.8095s | speedup=   5.81x eff=0.1210
+k=13 n=  8192 q=4 leaf=   16 | T1= 167.4630s Tp= 11.2832s | speedup=  14.84x eff=0.3092
+k=13 n=  8192 q=5 leaf=   32 | T1= 112.4683s Tp=  5.6054s | speedup=  20.06x eff=0.4180
+k=13 n=  8192 q=6 leaf=   64 | T1= 109.6516s Tp=  4.9173s | speedup=  22.30x eff=0.4646
+k=13 n=  8192 q=7 leaf=  128 | T1= 112.7248s Tp=  5.6737s | speedup=  19.87x eff=0.4139
+k=13 n=  8192 q=8 leaf=  256 | T1= 122.7569s Tp=  4.9214s | speedup=  24.94x eff=0.5197
+k=13 n=  8192 q=9 leaf=  512 | T1= 141.9206s Tp=  5.4283s | speedup=  26.14x eff=0.5447
+k=13 n=  8192 q=10 leaf= 1024 | T1= 153.9741s Tp=  8.3950s | speedup=  18.34x eff=0.3821
+k=14 n= 16384 q=4 leaf=   16 | T1=1177.2459s Tp= 48.0707s | speedup=  24.49x eff=0.5102
+k=14 n= 16384 q=5 leaf=   32 | T1= 797.4111s Tp= 31.5041s | speedup=  25.31x eff=0.5273
+k=14 n= 16384 q=6 leaf=   64 | T1= 762.9993s Tp= 30.5728s | speedup=  24.96x eff=0.5199
+k=14 n= 16384 q=7 leaf=  128 | T1= 795.1388s Tp= 29.8886s | speedup=  26.60x eff=0.5542
+k=14 n= 16384 q=8 leaf=  256 | T1= 859.7034s Tp= 33.8172s | speedup=  25.42x eff=0.5296
+k=14 n= 16384 q=9 leaf=  512 | T1=1010.5599s Tp= 34.1039s | speedup=  29.63x eff=0.6173
+k=14 n= 16384 q=10 leaf= 1024 | T1=1084.1160s Tp= 37.1538s | speedup=  29.18x eff=0.6079
+
+Wrote 36 lines to strassen_speedup_final.csv (1 header + data rows)
+Next: python3 plot_csv.py strassen_speedup_final.csv    # speedup / efficiency vs leaf size
+date: Fri Oct  2 12:33:17 CDT 2026
