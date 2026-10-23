@@ -1,0 +1,80 @@
+#!/bin/bash
+#SBATCH --job-name=qsort_weak
+#SBATCH --chdir=/home/nnh12/CSCE-735/HW4-735/HW4-735
+#SBATCH --partition=short
+#SBATCH --nodes=2
+#SBATCH --ntasks=96
+#SBATCH --ntasks-per-node=48
+#SBATCH --mem=300G
+#SBATCH --time=2:00:00
+#SBATCH --output=qsort_weak.%j.out
+
+# ---------------------------------------------------------------------------
+# Problem 2: weak scalability study
+#   n = 20,480,000 fixed per process, p = 1,2,4,...,64, type = 0
+#   Tp = time on p ranks with n local elements
+#   T1 = time on 1 rank with n*p elements
+#   S(p) = T1/Tp,  E(p) = S(p)/p
+#
+# Both nodes are allocated (48 tasks each) so the timing is dedicated, but
+# runs use -ppn 32 so that p<=32 stays on one node and p=64 is 32+32, which
+# matches the hypercube bisection (rank r and r^32 on different nodes).
+# ---------------------------------------------------------------------------
+
+set -u
+module load intel/2025b
+
+# Benchmark copy with a raised input cap so the 1-rank baselines for
+# p=16,32,64 (up to 1,310,720,000 elements) are accepted.
+sed 's/^#define MAX_LIST_SIZE_PER_PROC.*/#define MAX_LIST_SIZE_PER_PROC 1400000000/' \
+    qsort_hypercube.cpp > qsort_bench.cpp
+mpiicpx -O2 -o qsort_bench.exe qsort_bench.cpp || exit 1
+
+N=20480000
+REPS=3
+CSV=weak_results.csv
+echo "p,n_total,Tp,T1,S,E" > "$CSV"
+
+# best of REPS runs; prints -1 if a run produced no timing line
+best_time() {
+    local np=$1 n=$2 rep t best=-1
+    for rep in $(seq "$REPS"); do
+        t=$(mpirun -np "$np" -ppn 32 ./qsort_bench.exe "$n" 0 2>&1 \
+            | tee -a run.log \
+            | sed -n 's/.*hypercube quicksort time = //p' | head -1)
+        if [ -z "$t" ]; then
+            echo "FAILED: np=$np n=$n (see run.log)" >&2
+        elif [ "$best" = "-1" ] || \
+             awk -v a="$t" -v b="$best" 'BEGIN{exit !(a<b)}'; then
+            best=$t
+        fi
+    done
+    echo "$best"
+}
+
+# --- Sanity check: the four small Problem-1 tests -------------------------
+echo "=== sanity checks ==="
+for test in "2 4 -1" "4 4 -2" "8 4 -1" "16 4 0"; do
+    set -- $test
+    out=$(mpirun -np "$1" -ppn 32 ./qsort_bench.exe "$2" "$3" 2>&1)
+    echo "$out"
+    if ! echo "$out" | grep -q "Congratulations"; then
+        echo "SANITY CHECK FAILED: np=$1 n=$2 type=$3" >&2
+        exit 1
+    fi
+done
+echo "=== sanity checks passed ==="
+
+# --- Weak scaling runs ----------------------------------------------------
+for p in 1 2 4 8 16 32 64; do
+    total=$((N * p))
+    Tp=$(best_time "$p" "$N")
+    T1=$(best_time 1 "$total")
+    echo "p=$p total=$total Tp=$Tp T1=$T1"
+    awk -v p="$p" -v n="$total" -v tp="$Tp" -v t1="$T1" \
+        'BEGIN{ if (tp>0 && t1>0) { s=t1/tp; printf "%d,%d,%.6f,%.6f,%.4f,%.4f\n", p,n,tp,t1,s,s/p } }' \
+        >> "$CSV"
+done
+
+echo "Wrote $CSV"
+column -s, -t "$CSV"

@@ -1,0 +1,16 @@
+=== sanity checks ===
+[Proc: 0] number of processes = 2, initial local list size = 4, hypercube quicksort time = 0.000395
+[Proc: 0] Congratulations. The list has been sorted correctly.
+[Proc: 0] number of processes = 4, initial local list size = 4, hypercube quicksort time = 0.002196
+[Proc: 0] Congratulations. The list has been sorted correctly.
+[Proc: 0] number of processes = 8, initial local list size = 4, hypercube quicksort time = 0.002460
+[Proc: 0] Congratulations. The list has been sorted correctly.
+[Proc: 0] number of processes = 16, initial local list size = 4, hypercube quicksort time = 0.010373
+[Proc: 0] Congratulations. The list has been sorted correctly.
+=== sanity checks passed ===
+p=1 total=20480000 Tp=2.094286 T1=2.094632
+p=2 total=40960000 Tp=2.162573 T1=4.307525
+p=4 total=81920000 Tp=2.303636 T1=8.882521
+p=8 total=163840000 Tp=2.473007 T1=18.234196
+p=16 total=327680000 Tp=2.582158 T1=37.474760
+p=32 total=655360000 Tp=2.741165 T1=76.932189
