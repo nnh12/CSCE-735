@@ -1,0 +1,97 @@
+#!/bin/bash
+#SBATCH --job-name=qsort_strong
+#SBATCH --chdir=/home/nnh12/CSCE-735/HW4-735/HW4-735
+#SBATCH --partition=short
+#SBATCH --nodes=2
+#SBATCH --ntasks=96
+#SBATCH --ntasks-per-node=48
+#SBATCH --mem=64G
+#SBATCH --time=1:00:00
+#SBATCH --output=qsort_strong.%j.out
+
+# ---------------------------------------------------------------------------
+# Problem 3: strong scalability study
+#   Total list size N = 20,480,000 stays fixed; each process gets
+#   n = N/p elements, p = 1,2,4,...,64, type = 0.
+#   Tp = time on p ranks with n = N/p local elements
+#   T1 = time on 1 rank with N    = 20,480,000 elements (measured once)
+#   S(p) = T1/Tp,  E(p) = S(p)/p
+#
+# Both nodes are allocated (48 tasks each) so the timing is dedicated, but
+# runs use -ppn 32 so that p<=32 stays on one node and p=64 is 32+32, which
+# matches the hypercube bisection (rank r and r^32 on different nodes).
+#
+# Unlike the weak-scaling job, the input cap in qsort_hypercube.cpp does not
+# need to be raised: the largest list is N = 20,480,000 < 268,435,456.
+# ---------------------------------------------------------------------------
+
+set -u
+module load intel
+
+mpiicpx -O2 -o qsort_hypercube.exe qsort_hypercube.cpp || exit 1
+
+N=20480000
+REPS=3
+CSV=strong_results.csv
+echo "p,n,Tp,T1,S,E" > "$CSV"
+
+# best of REPS runs; prints -1 if a run produced no timing line
+best_time() {
+    local np=$1 n=$2 rep t best=-1
+    for rep in $(seq "$REPS"); do
+        t=$(mpirun -np "$np" -ppn 32 ./qsort_hypercube.exe "$n" 0 2>&1 \
+            | tee -a run_strong.log \
+            | sed -n 's/.*hypercube quicksort time = //p' | head -1)
+        if [ -z "$t" ]; then
+            echo "FAILED: np=$np n=$n (see run_strong.log)" >&2
+        elif [ "$best" = "-1" ] || \
+             awk -v a="$t" -v b="$best" 'BEGIN{exit !(a<b)}'; then
+            best=$t
+        fi
+    done
+    echo "$best"
+}
+
+# --- Sanity check: the four small Problem-1 tests -------------------------
+echo "=== sanity checks ==="
+for test in "2 4 -1" "4 4 -2" "8 4 -1" "16 4 0"; do
+    set -- $test
+    out=$(mpirun -np "$1" -ppn 32 ./qsort_hypercube.exe "$2" "$3" 2>&1)
+    echo "$out"
+    if ! echo "$out" | grep -q "Congratulations"; then
+        echo "SANITY CHECK FAILED: np=$1 n=$2 type=$3" >&2
+        exit 1
+    fi
+done
+echo "=== sanity checks passed ==="
+
+# --- Strong scaling runs --------------------------------------------------
+failed=0
+T1=$(best_time 1 "$N")
+if [ "$T1" = "-1" ]; then
+    echo "FAILED: baseline T1 (np=1 n=$N)" >&2
+    exit 1
+fi
+echo "T1 (np=1, n=$N) = $T1"
+
+for p in 1 2 4 8 16 32 64; do
+    n=$((N / p))
+    Tp=$(best_time "$p" "$n")
+    echo "p=$p n=$n Tp=$Tp T1=$T1"
+    if [ "$Tp" = "-1" ]; then
+        echo "FAILED: np=$p n=$n" >&2
+        failed=1
+        continue
+    fi
+    awk -v p="$p" -v n="$n" -v tp="$Tp" -v t1="$T1" \
+        'BEGIN{ s=t1/tp; printf "%d,%d,%.6f,%.6f,%.4f,%.4f\n", p,n,tp,t1,s,s/p }' \
+        >> "$CSV"
+done
+
+echo "Wrote $CSV"
+column -s, -t "$CSV"
+
+if [ "$failed" -ne 0 ]; then
+    echo "One or more strong-scaling runs failed; CSV is incomplete." >&2
+    exit 1
+fi
